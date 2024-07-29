@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拡張版食べ物リストホイール with Gradient Button and Decorative Circles</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: ヒラギノ角ゴシック;
+        }
+
+        .container {
+            position: relative;
+            width: 1200px;
+            height: 1200px;
+            overflow: hidden;
+        }
+
+        .round-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: transparent;
+            transition: all 0.3s;
+            z-index: 10;
+            overflow: hidden;
+        }
+
+        .round-button:after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(90deg, transparent, yellow);
+            z-index: 0;
+            transition: background-image 0.3s;
+        }
+
+        .round-button span {
+            position: relative;
+            z-index: 1;
+            color: black;
+            transition: opacity 0.3s;
+            opacity: 0;
+        }
+
+        .round-button.active span {
+            opacity: 1;
+        }
+
+        .round-button.active:after {
+            background-image: linear-gradient(90deg, yellow, yellow);
+        }
+
+        .food-wheel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .food-item {
+            position: absolute;
+            transform-origin: center;
+            width: 500px; /* 文字列コンテナの幅調整 */
+            text-align: left;
+            transition: opacity 0.3s;
+        }
+
+        .decorative-circles {
+            position: absolute;
+            top: 50%;
+            left: 15%;
+            transform: translateY(-50%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 25%;
+            height: 60px;
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .decorative-circle {
+            background-color: yellow;
+            border-radius: 50%;
+        }
+
+        .large-circle {
+            width: 60px;
+            height: 60px;
+        }
+
+        .medium-circle {
+            width: 30px;
+            height: 30px;
+        }
+
+        .small-circle {
+            width: 15px;
+            height: 15px;
+        }
+
+        .debug-circle {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border: 1px solid red;
+            border-radius: 50%;
+            top: 50px;
+            left: 50px;
+            pointer-events: none;
+        }
+        .debug-lines-wheel, .debug-lines-button {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .debug-line-horizontal, .debug-line-vertical {
+            position: absolute;
+            background-color: blue;
+            opacity: 0.5;
+        }
+        .debug-line-horizontal {
+            width: 100%;
+            height: 1px;
+            top: 50%;
+        }
+        .debug-line-vertical {
+            width: 1px;
+            height: 100%;
+            left: 50%;
+        }
+        .debug-lines-button .debug-line-horizontal,
+        .debug-lines-button .debug-line-vertical {
+            background-color: green;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="round-button" id="foodButton"><span>SELECT</span></button>
+        <div class="food-wheel" id="foodWheel"></div>
+        <div class="decorative-circles" id="decorativeCircles">
+            <div class="decorative-circle large-circle"></div>
+            <div class="decorative-circle medium-circle"></div>
+            <div class="decorative-circle small-circle"></div>
+        </div>
+        <!-- <div class="debug-lines-button">
+            <div class="debug-line-horizontal"></div>
+            <div class="debug-line-vertical"></div>
+        </div> -->
+    </div>
+
+    <script>
+        // 音声ファイルの準備
+        const decidingAudio = new Audio('/static/audio/deciding.mp3');
+        function playDecidingSound() {
+            decidingAudio.play();
+        }
+
+        const foods = ['1. Nightfall in Tokyo', '2. Kyoto Rain', '3. 桜の静寂', '4. Autumn in Arashiyama', '5. 星明かりの川辺', '6. Osaka Night Groove', '7. 浅草の夕暮れ', '8. Neon Dreams', '9. 鎌倉の風', '10. Harajuku Chill', '11. 梅雨のメロディ', '12. Zen Garden', '13. 鳥取砂丘の夜', '14. Shibuya Blues', '15. 銀座の夜明け', '16. Mt. Fuji Morning', '17. 神戸の黄昏', '18. Tranquil Temple', '19. 東京湾の夕焼け', '20. Lofi Lanterns', '21. 月夜の神社', '22. Yokohama Breeze', '23. 夏のひととき', '24. Serenity in Shinjuku'];
+        const container = document.querySelector('.container');
+        const button = document.getElementById('foodButton');
+        const foodWheel = document.getElementById('foodWheel');
+        const decorativeCircles = document.getElementById('decorativeCircles');
+
+        let isActive = false;
+        let currentRotation = 0;
+        let startIndex = foods.length - 6;
+
+        const visibleItems = 12;
+        const radius = Math.min(container.offsetWidth, container.offsetHeight) * 0.35; // 周回リストの円の大きさ
+
+        function createFoodItems() {
+            foodWheel.innerHTML = ''; // Clear existing items
+
+            for (let i = 0; i < visibleItems; i++) {
+                const index = (startIndex + i + foods.length) % foods.length;
+                const food = foods[index];
+
+                const foodElement = document.createElement('div');
+                foodElement.classList.add('food-item');
+                foodElement.textContent = food;
+                foodWheel.appendChild(foodElement);
+
+                updateFoodItemPosition(foodElement, i);
+                foodElement.style.opacity = isActive ? '1' : '0';
+            }
+        }
+
+        function updateFoodItemPosition(foodElement, index) {
+            const angle = ((index / visibleItems) * 360 + currentRotation + 180) % 360;
+            const x = Math.cos(angle * Math.PI / 180) * radius + foodWheel.offsetWidth / 2;
+            const y = Math.sin(angle * Math.PI / 180) * radius + foodWheel.offsetHeight / 2;
+            foodElement.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${angle}deg)`;
+
+            const isInvisible = (angle % 360 >= 150 && angle % 360 <= 210);
+            foodElement.style.visibility = isInvisible ? 'hidden' : 'visible';
+
+            if (Math.abs(angle - 0) < 1) {
+                foodElement.style.fontWeight = 'bold';
+                foodElement.style.cursor = 'pointer';
+                foodElement.style.fontSize = '180%';
+                foodElement.onclick = () => {
+                    shakeElement(foodElement, x, y, angle);
+                    playDecidingSound();
+                };
+            } else {
+                foodElement.style.fontWeight = 'normal';
+                foodElement.style.cursor = 'default';
+                foodElement.style.fontSize = '100%';
+                foodElement.onclick = null;
+            }
+        }
+
+        function shakeElement(element, x, y, angle) {
+            const originalTransform = element.style.transform;
+            const shakeIntensity = 8;
+            const shakeDuration = 200;
+            const shakeInterval = 50;
+            let shakeCount = 0;
+
+            const shakeIntervalId = setInterval(() => {
+                const shakeX = x + (Math.random() - 0.5) * shakeIntensity;
+                const shakeY = y + (Math.random() - 0.5) * shakeIntensity;
+                element.style.transform = `translate(${shakeX}px, ${shakeY}px) translate(-50%, -50%) rotate(${angle}deg)`;
+
+                shakeCount++;
+                if (shakeCount >= shakeDuration / shakeInterval) {
+                    clearInterval(shakeIntervalId);
+                    element.style.transform = originalTransform;
+                }
+            }, shakeInterval);
+        }
+
+        function rotateWheel(delta) {
+            currentRotation += delta;
+            const fullRotation = 360 / visibleItems;
+
+            if (currentRotation >= fullRotation) {
+                currentRotation -= fullRotation;
+                startIndex = (startIndex - 1 + foods.length) % foods.length;
+                createFoodItems();
+            } else if (currentRotation <= -fullRotation) {
+                currentRotation += fullRotation;
+                startIndex = (startIndex + 1) % foods.length;
+                createFoodItems();
+            }
+            
+            document.querySelectorAll('.food-item').forEach((item, index) => {
+                updateFoodItemPosition(item, index);
+            });
+        }
+
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            isActive = !isActive;
+            button.classList.toggle('active');
+            button.querySelector('span').textContent = isActive ? 'SELECT\nTUNES' : '';
+            createFoodItems(); // ボタンクリック時に食べ物リストを作成/更新
+            decorativeCircles.style.opacity = isActive ? '1' : '0'; // 装飾的な円の表示/非表示を切り替え
+        });
+
+        container.addEventListener('wheel', (event) => {
+            if (isActive) {
+                event.preventDefault();
+                rotateWheel(event.deltaY > 0 ? 10 : -10);
+            }
+        });
+    </script>
+</body>
+</html>
